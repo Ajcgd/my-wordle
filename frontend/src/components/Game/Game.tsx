@@ -3,66 +3,124 @@ import "./Game.css";
 import {Line} from "../Line/Line";
 
 import LineState from "../../types/lineState";
-import { useEffect, useState } from "react";
-
-const words:string[][] = [];
-
-const states: LineState[] = [LineState.ACTIVE, LineState.EMPTY, LineState.EMPTY, LineState.EMPTY, LineState.EMPTY, LineState.EMPTY];
+import { useContext, useEffect, useState } from "react";
+import GameContext from "../../context/GameContext";
 
 const Game = (props:any) => {
-    const [currLine, setCurrline] = useState(0);
-    const [currLetter, setCurrLetter] = useState(0);
+    //@ts-ignore
+    const { gameState, setGameState } = useContext(GameContext);
+    const [victory, setVictory] = useState(false);
 
     const targetWord = "autos";
     const chars = [...targetWord]
 
+    const occurences: any = {};
 
-    useEffect (() => {
-        const keyDownHandler = (event:any) => {
-            if (event.key === "Backspace") {
-                setCurrLetter(Math.max(currLetter - 1, 0));
-                words[currLine].pop();
+    useEffect(() => {
+      localStorage.setItem("gameState", JSON.stringify(gameState));
+    }, [gameState]);
+
+    const reset = () => {
+      setGameState({
+        line: 0,
+        letter: 0,
+        states: [
+          LineState.ACTIVE,
+          LineState.EMPTY,
+          LineState.EMPTY,
+          LineState.EMPTY,
+          LineState.EMPTY,
+          LineState.EMPTY,
+        ],
+        words: [],
+      });
+      setVictory(false);
+      localStorage.setItem("gameState", JSON.stringify(gameState));
+    }
+
+    useEffect(() => {
+      for (var i = 0; i < targetWord.length; i++) {
+        const char = targetWord[i];
+        occurences[char] = occurences[char] ? occurences[char] + 1 : 1;
+      }
+    }, [])
+
+    useEffect(() => {
+      if (victory) {
+        setTimeout(() => {
+          alert("You won!");
+          reset();
+        }, 1500)
+      }
+    }, [victory])
+
+    useEffect(() => {
+      if (!victory && gameState.line === gameState.states.length) {
+        setTimeout(() => {
+          alert("You lost!");
+          reset();
+        }, 1500);
+      }
+    }, [gameState.line])
+
+
+    useEffect(() => {
+      const keyDownHandler = (event: any) => {
+        if (event.key === "Backspace") {
+          setGameState({
+            ...gameState,
+            letter: Math.max(gameState.letter - 1, 0),
+          });
+          gameState.words[gameState.line].pop();
+        } else if (event.key === "Enter") {
+          if (gameState.letter === +props.size) {
+            gameState.states[gameState.line] = LineState.FILLED;
+            if (gameState.line !== gameState.states.length - 1) {
+              gameState.states[gameState.line + 1] = LineState.ACTIVE;
             }
-            else if (event.key === "Enter") {
-                if (currLetter === +props.size) {
-                    states[currLine] = LineState.FILLED;
-                    states[currLine + 1] = LineState.ACTIVE;
-                    setCurrline(currLine + 1);
-                    setCurrLetter(0);
-                }
-            }
-            if (event.key.match(/^[a-zA-ZÀ-ž]$/g)) {
-                if (currLetter !== +props.size) {
-                  setCurrLetter(currLetter + 1);
-                  if (! words[currLine]) {
-                    words[currLine] = [];
-                  }
-                  words[currLine].push(event.key);
-                }
-            }
+            setGameState({
+              ...gameState,
+              letter: 0,
+              line: gameState.line + 1,
+            });
+          }
         }
-        document.addEventListener("keydown", keyDownHandler);
-
-
-        return () => {
-            document.removeEventListener("keydown", keyDownHandler);
+        if (event.key.match(/^[a-zA-ZÀ-ž]$/g)) {
+          if (gameState.letter !== +props.size) {
+            setGameState({
+              ...gameState,
+              letter: gameState.letter + 1,
+            });
+            if (!gameState.words[gameState.line]) {
+              gameState.words[gameState.line] = [];
+            }
+            gameState.words[gameState.line].push(event.key);
+          }
         }
-    }, [currLine, currLetter, words])
+      };
+      document.addEventListener("keydown", keyDownHandler);
+
+      return () => {
+        document.removeEventListener("keydown", keyDownHandler);
+      };
+    }, [gameState.line, gameState.letter, gameState.words]);
 
 
     return (
-        <div className="game-container">
-          {[...Array(6).keys()].map((i) => {
-            return (
-              <Line
-                size={props.size}
-                active={states[i]}
-                word={words[i]}
-                key={i}
-                chars={chars}
-              />
-            );
-          })}
+      <div className="game-container">
+        {[...Array(6).keys()].map((i) => {
+          return (
+            <Line
+              size={props.size}
+              active={gameState.states[i]}
+              word={gameState.words[i]}
+              key={i}
+              chars={chars}
+              occurences={occurences}
+              setVictory={setVictory}
+            />
+          );
+        })}
       </div>
     );
 }
